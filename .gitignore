@@ -1,0 +1,55 @@
+# === FPGA Build Artifacts ===
+# Simulation files (Icarus Verilog)
+sim/*.vvp
+sim/*_sim
+sim/waves/*.vcd
+sim/waves/*.fst
+sim/waves/*.lxt*
+sim/waves/*.ghw
+sim/logs/*.log
+
+# Synthesis outputs (Yosys)
+backend/synth/*.json
+backend/synth/*.ys
+backend/synth/*_synth.v
+
+# Place & Route outputs (NextPNR)
+backend/pnr/*.asc
+backend/pnr/*.config
+backend/pnr/*.json
+
+# Bitstream files
+backend/bitstream/*.bin
+backend/bitstream/*.bit
+backend/bitstream/*.fs
+
+# Reports and logs
+backend/reports/*.log
+backend/reports/*.rpt
+backend/reports/*.json
+
+# Verilator outputs (if used)
+sim/obj_dir/
+*.d
+
+# === Development Files ===
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Editor specific
+*.swp
+*.swo
+.vscode/
+.idea/
+*.sublime-*
+
+# OS specific
+.DS_Store
+Thumbs.db
+*.directory
+
+# === Project Specific ===
+# Auto-generated file lists (should be regenerated)
+sources/rtl_list.f
