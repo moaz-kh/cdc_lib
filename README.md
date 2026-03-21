@@ -1,6 +1,6 @@
 # fpga_cdc_lib
 
-A reusable, parameterized **Clock Domain Crossing (CDC)** synchronizer library in SystemVerilog. Provides 7 hierarchical modules covering the most common CDC patterns in FPGA design — from single-bit synchronization to a full async FIFO.
+A reusable, parameterized **Clock Domain Crossing (CDC)** synchronizer library in SystemVerilog. Provides 8 hierarchical modules covering the most common CDC patterns in FPGA design — from single-bit synchronization to async and sync FIFOs.
 
 All modules are verified with self-checking testbenches and pass iCE40 synthesis (Yosys).
 
@@ -25,6 +25,8 @@ cdc_handshake     handshake-based multi-bit bus synchronizer
 cdc_fifo          small async FIFO (Cummings-style)
   |--------------------uses cdc_counter x 2
   |--------------------uses cdc_gray_conv x 2
+  |
+cdc_sync_fifo     single-clock synchronous FIFO (standalone)
 ```
 
 ## Modules
@@ -139,6 +141,24 @@ full    <--[ ptr  ptr ]<-- empty
 
 Register-array memory with combinational read. Supports concurrent read/write at full throughput.
 
+### cdc_sync_fifo
+
+Single-clock synchronous FIFO for same-domain buffering. Supports registered read (default) or FWFT mode.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `WIDTH` | 8 | Data width |
+| `DEPTH` | 16 | FIFO depth (must be power of 2) |
+| `FWFT_MODE` | 0 | 0 = registered read (1-cycle latency), 1 = FWFT (zero latency) |
+
+| Port | Direction | Description |
+|------|-----------|-------------|
+| `count` | out | Current occupancy (ADDR_WIDTH+1 bits) |
+| `full` | out | Asserted when FIFO is full |
+| `empty` | out | Asserted when FIFO is empty |
+
+Standalone module with no CDC dependencies. Useful as a data buffer within a single clock domain.
+
 ## Quick Start
 
 ```bash
@@ -156,6 +176,7 @@ make sim TOP_MODULE=cdc_pulse          TESTBENCH=cdc_pulse_tb
 make sim TOP_MODULE=cdc_counter        TESTBENCH=cdc_counter_tb
 make sim TOP_MODULE=cdc_handshake  TESTBENCH=cdc_handshake_tb
 make sim TOP_MODULE=cdc_fifo       TESTBENCH=cdc_fifo_tb
+make sim TOP_MODULE=cdc_sync_fifo  TESTBENCH=cdc_sync_fifo_tb
 
 # Synthesize any module for iCE40
 make synth-ice40 TOP_MODULE=cdc_fifo
@@ -205,6 +226,14 @@ cdc_fifo #(.WIDTH(16), .DEPTH(8)) u_stream_fifo (
     .rd_clk   (proc_clk), .rd_rst_n (proc_rst_n),
     .rd_en    (read_en),     .rd_data (proc_data),   .empty (fifo_empty)
 );
+
+// Single-clock buffering (FWFT mode)
+cdc_sync_fifo #(.WIDTH(32), .DEPTH(16), .FWFT_MODE(1)) u_cmd_buf (
+    .clk   (sys_clk),  .rst_n (sys_rst_n),
+    .wr_en (cmd_valid), .wr_data (cmd_data), .full (cmd_full),
+    .rd_en (cmd_read),  .rd_data (cmd_out),  .empty (cmd_empty),
+    .count (cmd_count)
+);
 ```
 
 ## Design Conventions
@@ -228,7 +257,8 @@ fpga_cdc_lib/
 │   │   ├── cdc_counter.sv
 │   │   ├── cdc_handshake.sv
 │   │   ├── cdc_fifo.sv
-│   ├── tb/                          # 7 self-checking testbenches
+│   │   ├── cdc_sync_fifo.sv
+│   ├── tb/                          # 8 self-checking testbenches
 │   ├── include/
 │   └── constraints/
 ├── sim/
@@ -266,6 +296,7 @@ fpga_cdc_lib/
 | cdc_counter | PASS | PASS |
 | cdc_handshake | PASS | PASS |
 | cdc_fifo | PASS | PASS |
+| cdc_sync_fifo | PASS | PASS |
 
 ## License
 

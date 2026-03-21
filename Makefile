@@ -2,8 +2,8 @@
 # Family-based architecture with iCE40 implementation
 
 PROJECT = sync_lib
-TOP_MODULE ?= adder
-TESTBENCH ?= adder_tb
+TOP_MODULE ?= cdc_bit
+TESTBENCH ?= cdc_bit_tb
 
 # FPGA family configuration - extensible for future families
 FPGA_FAMILY ?= ice40
@@ -104,9 +104,28 @@ help:
 	@echo "  RTL_DIR=path        - Override RTL directory (default: $(RTL_DIR))"
 	@echo "  TB_DIR=path         - Override testbench directory (default: $(TB_DIR))"
 	@echo ""
-	@echo "Examples:"
-	@echo "  make sim TOP_MODULE=counter TESTBENCH=counter_tb"
-	@echo "  make ice40 FPGA_DEVICE=hx8k FPGA_PACKAGE=ct256"
+	@echo "Simulation examples:"
+	@echo "  make sim TOP_MODULE=cdc_bit        TESTBENCH=cdc_bit_tb"
+	@echo "  make sim TOP_MODULE=cdc_counter    TESTBENCH=cdc_counter_tb"
+	@echo "  make sim TOP_MODULE=cdc_fifo       TESTBENCH=cdc_fifo_tb"
+	@echo "  make sim TOP_MODULE=cdc_gray_conv  TESTBENCH=cdc_gray_conv_tb"
+	@echo "  make sim TOP_MODULE=cdc_handshake  TESTBENCH=cdc_handshake_tb"
+	@echo "  make sim TOP_MODULE=cdc_pulse      TESTBENCH=cdc_pulse_tb"
+	@echo "  make sim TOP_MODULE=cdc_reset      TESTBENCH=cdc_reset_tb"
+	@echo "  make sim TOP_MODULE=cdc_sync_fifo  TESTBENCH=cdc_sync_fifo_tb"
+	@echo ""
+	@echo "Synthesis examples:"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_bit"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_counter"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_fifo"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_gray_conv"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_handshake"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_pulse"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_reset"
+	@echo "  make synth-ice40 TOP_MODULE=cdc_sync_fifo"
+	@echo ""
+	@echo "Full FPGA flow example:"
+	@echo "  make ice40 TOP_MODULE=cdc_sync_fifo"
 	@echo ""
 	@echo "Simulation targets:"
 	@echo "  sim           - Run simulation with Icarus Verilog"
