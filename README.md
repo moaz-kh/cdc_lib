@@ -298,6 +298,12 @@ fpga_cdc_lib/
 | cdc_fifo | PASS | PASS |
 | cdc_sync_fifo | PASS | PASS |
 
+## Development
+
+This project includes a `CLAUDE.md` file with detailed guidance for AI-assisted development — covering HDL coding standards, naming conventions, reset/clock rules, FSM templates, and project workflow for both Verilog/SystemVerilog and VHDL.
+
 ## License
 
-This project is part of an FPGA design portfolio. See repository root for license details.
+MIT License — Copyright (c) 2026 [moaz khaled](https://github.com/moazk).
+
+Free to use, modify, and distribute for any purpose. Attribution required — keep the copyright notice in all copies or substantial portions of the code.
