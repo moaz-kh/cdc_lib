@@ -109,6 +109,20 @@ These modules are already available in `STD_MODULES.v` / `STD_MODULES.vhd` — d
 
 ---
 
+## Module Design Decisions
+
+Non-obvious design choices that must be preserved when modifying existing modules.
+
+### `cdc_pulse` — counter mode (`cdc_pulse_counter`)
+
+`dst_pulse` is a **registered output** (`dst_pulse_r`). Do not change it to a combinational assign of `(dst_count_local != dst_count_sync)`.
+
+**Why:** A combinational assign stays high for N consecutive dst cycles when N src pulses accumulate before the first dst pulse is processed — producing a single wide pulse instead of N separate 1-cycle pulses. The registered design uses `dst_pulse_r` as a self-gate: the in-flight pulse suppresses the next firing for one cycle, guaranteeing every output pulse is exactly 1 dst_clk wide with a mandatory 1-cycle gap between consecutive pulses.
+
+`dst_count_local` is incremented **in the same cycle** the pulse fires (inside the `if (!dst_pulse_r && ...)` branch), not the cycle after. This is intentional — it ensures the gap cycle sees the updated count and immediately checks for remaining pending pulses.
+
+---
+
 # RTL Coding Guidelines
 
 Follow these guidelines strictly when writing, reviewing, or refactoring any HDL code.

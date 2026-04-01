@@ -71,10 +71,12 @@ module cdc_pulse_counter #(
     logic [CTR_WIDTH-1:0] src_count;
     logic [CTR_WIDTH-1:0] dst_count_sync;
     logic [CTR_WIDTH-1:0] dst_count_local;
+    logic                 dst_pulse_r;
 
     initial begin
         src_count       = '0;
         dst_count_local = '0;
+        dst_pulse_r     = 1'b0;
     end
 
     always_ff @(posedge src_clk) begin
@@ -96,15 +98,22 @@ module cdc_pulse_counter #(
         .gray_in_out ()
     );
 
-    // Generate one pulse per count difference
+    // Generate one pulse per count difference: exactly 1 dst_clk wide,
+    // mandatory 1-cycle gap between consecutive pulses (self-gating via dst_pulse_r).
     always_ff @(posedge dst_clk) begin
-        if (!dst_rst_n)
+        if (!dst_rst_n) begin
             dst_count_local <= '0;
-        else if (dst_count_local != dst_count_sync)
-            dst_count_local <= dst_count_local + 1'b1;
+            dst_pulse_r     <= 1'b0;
+        end else begin
+            dst_pulse_r <= 1'b0;
+            if (!dst_pulse_r && (dst_count_local != dst_count_sync)) begin
+                dst_pulse_r     <= 1'b1;
+                dst_count_local <= dst_count_local + 1'b1;
+            end
+        end
     end
 
-    assign dst_pulse = (dst_count_local != dst_count_sync);
+    assign dst_pulse = dst_pulse_r;
 
 endmodule
 

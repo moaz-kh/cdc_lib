@@ -85,7 +85,7 @@ Transfers pulses across clock domains. Two compile-time selectable architectures
 
 **MODE=0 (toggle)** — Lightweight. Toggles a FF on each src pulse, syncs the level, edge-detects in dst. Requires spacing between consecutive pulses (at least `2*SYNC_STAGES + 1` dst clocks).
 
-**MODE=1 (counter)** — Counts pulses in src, syncs the counter via `cdc_counter`, and generates matching pulses in dst. Guarantees **N pulses in = N pulses out**, even with back-to-back bursts. More logic, but handles any pulse rate the src can produce.
+**MODE=1 (counter)** — Counts pulses in src domain, syncs the counter via `cdc_counter`, and generates matching pulses in dst domain. Guarantees **N pulses in = N pulses out**, even with back-to-back or contiguous bursts. Each `dst_pulse` is exactly **1 dst_clk wide**, separated by a mandatory 1-cycle gap between consecutive pulses. Maximum dst throughput is 1 pulse per 2 dst clocks. More logic than toggle mode, but handles any pulse rate the src can produce.
 
 ### cdc_counter
 

@@ -55,6 +55,19 @@ module cdc_pulse_tb;
         if (dst_pulse_c) dst_count_c++;
     end
 
+    // Pulse-shape monitor: dst_pulse_c must never be high two consecutive dst_clk cycles.
+    // A wide pulse (RTL bug) will trigger this immediately.
+    logic dst_pulse_c_prev;
+    initial dst_pulse_c_prev = 1'b0;
+
+    always @(posedge dst_clk) begin
+        if (dst_pulse_c && dst_pulse_c_prev) begin
+            $display("ERROR [monitor]: dst_pulse_c HIGH for 2+ consecutive cycles (wide pulse bug)");
+            errors = errors + 1;
+        end
+        dst_pulse_c_prev = dst_pulse_c;
+    end
+
     // Helper task: send single-cycle pulse on src_pulse_t
     task automatic send_toggle_pulse();
         @(posedge src_clk); #1;
@@ -68,6 +81,17 @@ module cdc_pulse_tb;
         @(posedge src_clk); #1;
         src_pulse_c = 1;
         @(posedge src_clk); #1;
+        src_pulse_c = 0;
+    endtask
+
+    // Task: hold src_pulse_c HIGH for exactly N consecutive src_clk cycles (zero gaps).
+    task automatic send_burst_contiguous(input integer n);
+        integer i;
+        @(posedge src_clk); #1;
+        for (i = 0; i < n; i++) begin
+            src_pulse_c = 1;
+            @(posedge src_clk); #1;
+        end
         src_pulse_c = 0;
     endtask
 
@@ -197,6 +221,24 @@ module cdc_pulse_tb;
         end
 
         repeat(10) @(posedge dst_clk);
+
+        // Test C5: Contiguous burst — src_pulse_c held HIGH for 6 consecutive src_clk cycles
+        $display("Test C5: Contiguous burst (6 consecutive src pulses, no gaps)");
+        dst_count_c = 0;
+
+        send_burst_contiguous(6);
+
+        // Fixed impl: 6 pulses x 2 dst cycles = 12 minimum; SYNC_STAGES + 15 has 3-cycle margin
+        repeat(SYNC_STAGES + 15) @(posedge dst_clk);
+
+        if (dst_count_c !== 6) begin
+            $display("ERROR [counter]: Expected 6 dst pulses from contiguous burst, got %0d", dst_count_c);
+            errors++;
+        end else begin
+            $display("INFO [counter]: All 6 contiguous burst pulses received correctly");
+        end
+
+        repeat(5) @(posedge dst_clk);
 
         if (errors == 0)
             $display("*** TEST PASSED ***");
