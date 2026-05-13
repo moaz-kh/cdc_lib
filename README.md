@@ -1,4 +1,4 @@
-# fpga_cdc_lib
+# cdc_lib
 
 A reusable, parameterized **Clock Domain Crossing (CDC)** synchronizer library in SystemVerilog. Provides 8 hierarchical modules covering the most common CDC patterns in FPGA design — from single-bit synchronization to async and sync FIFOs.
 
@@ -248,7 +248,7 @@ cdc_sync_fifo #(.WIDTH(32), .DEPTH(16), .FWFT_MODE(1)) u_cmd_buf (
 ## Directory Structure
 
 ```
-fpga_cdc_lib/
+cdc_lib/
 ├── sources/
 │   │   ├── cdc_bit.sv
 │   │   ├── cdc_reset.sv
