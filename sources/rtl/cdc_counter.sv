@@ -8,6 +8,7 @@
 // Date   : <date>
 //-----------------------------------------------------------------------------
 `default_nettype none
+`include "cdc_config.svh"
 
 module cdc_counter #(
     parameter int unsigned WIDTH       = 4,
@@ -42,7 +43,11 @@ module cdc_counter #(
 
     // Register binary and its Gray code in the same clock cycle — no extra
     // latency, and gray_r is always a stable FF output for the synchronizer.
+    `ifdef CDC_ASYNC_RESET
     always_ff @(posedge i_src_clk or negedge i_src_rst_n) begin
+    `else
+    always_ff @(posedge i_src_clk) begin
+    `endif
         if (!i_src_rst_n) begin
             count_r <= '0;
             gray_r  <= '0;

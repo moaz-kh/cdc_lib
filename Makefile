@@ -27,6 +27,7 @@ XDC_FILE ?= sources/constraints/$(TOP_MODULE).xdc
 # Directories
 RTL_DIR ?= sources/rtl
 TB_DIR ?= sources/tb
+INCLUDE_DIR ?= sources/include
 SIM_DIR ?= sim
 WAVE_DIR = $(SIM_DIR)/waves
 LOG_DIR = $(SIM_DIR)/logs
@@ -60,6 +61,18 @@ OPENFPGALOADER := $(shell command -v openFPGALoader 2> /dev/null)
 # Compiler flags for different targets
 SIM_FLAGS = -D SIMULATION           # Enable simulation features for testbenches
 SYNTH_FLAGS = -D SYNTHESIS          # Define synthesis mode (disable simulation features)
+
+# Reset style: leave unset to use cdc_config.svh default (sync); override per run:
+#   make sim RESET_STYLE=async   → async reset, ASIC-portable
+#   make sim RESET_STYLE=sync    → sync reset, FPGA-optimized (forces even if config says async)
+RESET_STYLE ?=
+ifeq ($(RESET_STYLE), async)
+  SIM_FLAGS   += -DCDC_ASYNC_RESET
+  SYNTH_FLAGS += -DCDC_ASYNC_RESET
+else ifeq ($(RESET_STYLE), sync)
+  SIM_FLAGS   += -UCDC_ASYNC_RESET
+  SYNTH_FLAGS += -UCDC_ASYNC_RESET
+endif
 
 # Simulation files
 SIM_TOP = $(SIM_DIR)/$(TESTBENCH).vvp
@@ -317,7 +330,7 @@ $(SIM_TOP): $(FILELIST) $(shell find $(RTL_DIR) $(TB_DIR) -name "*.v" -o -name "
 		echo "TIP: Then run 'make update_list'"; \
 		exit 1; \
 	fi
-	@$(IVERILOG) -g2009 $(SIM_FLAGS) -f $(FILELIST) -s $(TESTBENCH) -o $(SIM_TOP)
+	@$(IVERILOG) -g2009 $(SIM_FLAGS) -I$(INCLUDE_DIR) -f $(FILELIST) -s $(TESTBENCH) -o $(SIM_TOP)
 	@echo "Compilation successful!"
 
 .PHONY: waves

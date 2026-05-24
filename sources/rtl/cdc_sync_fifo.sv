@@ -2,6 +2,8 @@
 // Simple FIFO for same-clock-domain buffering.
 // Supports registered read (default) or FWFT mode via parameter.
 
+`include "cdc_config.svh"
+
 module cdc_sync_fifo #(
     parameter int WIDTH     = 8,
     parameter int DEPTH     = 16,
@@ -36,11 +38,13 @@ module cdc_sync_fifo #(
 
     logic wr_en_int, rd_en_int;
 
+    `ifndef CDC_ASYNC_RESET
     initial begin
         wr_ptr     = '0;
         rd_ptr     = '0;
         fifo_count = '0;
     end
+    `endif
 
     assign wr_en_int = i_wr_en & ~o_full;
     assign rd_en_int = i_rd_en & ~o_empty;
@@ -50,7 +54,11 @@ module cdc_sync_fifo #(
     assign o_count = fifo_count;
 
     // Write pointer and memory
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_clk or negedge i_rst_n) begin
+    `else
     always_ff @(posedge i_clk) begin
+    `endif
         if (!i_rst_n)
             wr_ptr <= '0;
         else if (wr_en_int) begin
@@ -64,16 +72,26 @@ module cdc_sync_fifo #(
         if (FWFT_MODE) begin : gen_fwft
             assign o_rd_data = mem[rd_ptr];
 
+            `ifdef CDC_ASYNC_RESET
+            always_ff @(posedge i_clk or negedge i_rst_n) begin
+            `else
             always_ff @(posedge i_clk) begin
+            `endif
                 if (!i_rst_n)
                     rd_ptr <= '0;
                 else if (rd_en_int)
                     rd_ptr <= rd_ptr + 1'b1;
             end
         end else begin : gen_sync
+            `ifndef CDC_ASYNC_RESET
             initial o_rd_data = '0;
+            `endif
 
+            `ifdef CDC_ASYNC_RESET
+            always_ff @(posedge i_clk or negedge i_rst_n) begin
+            `else
             always_ff @(posedge i_clk) begin
+            `endif
                 if (!i_rst_n) begin
                     rd_ptr    <= '0;
                     o_rd_data <= '0;
@@ -86,7 +104,11 @@ module cdc_sync_fifo #(
     endgenerate
 
     // Count management
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_clk or negedge i_rst_n) begin
+    `else
     always_ff @(posedge i_clk) begin
+    `endif
         if (!i_rst_n)
             fifo_count <= '0;
         else begin

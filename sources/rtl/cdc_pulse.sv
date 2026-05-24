@@ -7,6 +7,8 @@
 //                      pulse count in the src domain and synchronizes it to dst.
 //                      dst generates pulses to match. Guarantees N-in = N-out.
 
+`include "cdc_config.svh"
+
 module cdc_pulse_toggle #(
     parameter int SYNC_STAGES = 2
 ) (
@@ -22,12 +24,18 @@ module cdc_pulse_toggle #(
     logic toggle_dst;
     logic toggle_dst_prev;
 
+    `ifndef CDC_ASYNC_RESET
     initial begin
         toggle_src      = 1'b0;
         toggle_dst_prev = 1'b0;
     end
+    `endif
 
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_src_clk or negedge i_src_rst_n) begin
+    `else
     always_ff @(posedge i_src_clk) begin
+    `endif
         if (!i_src_rst_n)
             toggle_src <= 1'b0;
         else if (i_src_pulse)
@@ -44,7 +52,11 @@ module cdc_pulse_toggle #(
         .o_sync_out (toggle_dst)
     );
 
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_dst_clk or negedge i_dst_rst_n) begin
+    `else
     always_ff @(posedge i_dst_clk) begin
+    `endif
         if (!i_dst_rst_n)
             toggle_dst_prev <= 1'b0;
         else
@@ -72,10 +84,12 @@ module cdc_pulse_counter #(
     logic [CTR_WIDTH-1:0] dst_count_local;
     logic                 dst_pulse_r;
 
+    `ifndef CDC_ASYNC_RESET
     initial begin
         dst_count_local = '0;
         dst_pulse_r     = 1'b0;
     end
+    `endif
 
     // cdc_counter owns the src-domain pulse count and synchronizes it to dst.
     cdc_counter #(
@@ -95,7 +109,11 @@ module cdc_pulse_counter #(
 
     // Generate one pulse per count difference: exactly 1 dst_clk wide,
     // mandatory 1-cycle gap between consecutive pulses (self-gating via dst_pulse_r).
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_dst_clk or negedge i_dst_rst_n) begin
+    `else
     always_ff @(posedge i_dst_clk) begin
+    `endif
         if (!i_dst_rst_n) begin
             dst_count_local <= '0;
             dst_pulse_r     <= 1'b0;

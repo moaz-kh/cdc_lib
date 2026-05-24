@@ -3,6 +3,8 @@
 // This is the one valid use of async reset in FPGA design.
 // Active-low reset: i_async_rst_n=0 asserts instantly, deasserts after SYNC_STAGES clocks.
 
+`include "cdc_config.svh"
+
 module cdc_reset #(
     parameter int SYNC_STAGES = 2
 ) (

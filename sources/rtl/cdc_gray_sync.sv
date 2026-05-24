@@ -8,6 +8,7 @@
 // Date   : <date>
 //-----------------------------------------------------------------------------
 `default_nettype none
+`include "cdc_config.svh"
 
 module cdc_gray_sync #(
     parameter int unsigned WIDTH       = 4,

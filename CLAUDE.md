@@ -131,9 +131,9 @@ cdc_sync_fifo           — standalone: single-clock synchronous FIFO (no CDC de
 
 **Library-wide design conventions** (must be preserved in all modules):
 
-- `(* ASYNC_REG = "TRUE" *)` attribute on every synchronizer flip-flop chain for correct FPGA placement.
-- `initial` blocks set power-up state to match reset values — required for FPGA simulation before reset is released.
-- Synchronous reset (`posedge clk`) everywhere **except** `cdc_reset`, which uses async assert (`negedge async_rst_n`) by design.
+- **Reset style is controlled by `CDC_ASYNC_RESET`** (`sources/include/cdc_config.svh`): undefined (default) = synchronous reset + `initial` blocks, FPGA-optimized; defined = async reset (`negedge rst_n` in sensitivity), no `initial` blocks, ASIC-portable. Edit `cdc_config.svh` to change the project default, or override per run with `make sim RESET_STYLE=async`. `cdc_reset.sv` is exempt and always uses async reset.
+- `(* ASYNC_REG = "TRUE" *)` attribute on every synchronizer flip-flop chain (`cdc_bit`) for correct FPGA placement. Guarded by `` `ifndef CDC_ASYNC_RESET `` — removed in async mode since it is a Vivado-specific attribute.
+- `initial` blocks set power-up state to match reset values — required for FPGA simulation before reset is released. Guarded by `` `ifndef CDC_ASYNC_RESET `` and absent in async (ASIC) mode.
 - `cdc_gray_sync` requires its `gray_in` to be a registered FF output from the source domain — it is the caller's responsibility to register before passing in.
 
 ---

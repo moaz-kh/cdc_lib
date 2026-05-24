@@ -3,6 +3,8 @@
 // clock domains. Data is held stable in a holding register while
 // req/ack toggles cross domains via cdc_bit.
 
+`include "cdc_config.svh"
+
 module cdc_handshake #(
     parameter int WIDTH       = 8,
     parameter int SYNC_STAGES = 2
@@ -33,6 +35,7 @@ module cdc_handshake #(
     logic               ack_toggle;
     logic               req_sync_prev;
 
+    `ifndef CDC_ASYNC_RESET
     initial begin
         req_toggle    = 1'b0;
         data_hold     = '0;
@@ -42,6 +45,7 @@ module cdc_handshake #(
         o_dst_data    = '0;
         o_dst_valid   = 1'b0;
     end
+    `endif
 
     // --- Source domain ---
 
@@ -57,7 +61,11 @@ module cdc_handshake #(
     );
 
     // Source logic: capture data and toggle req on accepted transfer
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_src_clk or negedge i_src_rst_n) begin
+    `else
     always_ff @(posedge i_src_clk) begin
+    `endif
         if (!i_src_rst_n) begin
             req_toggle <= 1'b0;
             data_hold  <= '0;
@@ -91,7 +99,11 @@ module cdc_handshake #(
     );
 
     // Destination logic: detect req change, capture data, ack
+    `ifdef CDC_ASYNC_RESET
+    always_ff @(posedge i_dst_clk or negedge i_dst_rst_n) begin
+    `else
     always_ff @(posedge i_dst_clk) begin
+    `endif
         if (!i_dst_rst_n) begin
             ack_toggle    <= 1'b0;
             req_sync_prev <= 1'b0;

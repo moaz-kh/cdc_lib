@@ -8,6 +8,7 @@
 // Date   : <date>
 //-----------------------------------------------------------------------------
 `default_nettype none
+`include "cdc_config.svh"
 
 module cdc_fifo #(
     parameter int WIDTH       = 8,
@@ -50,12 +51,14 @@ module cdc_fifo #(
     logic [PTR_WIDTH-1:0] rd_ptr_gray_r;    // registered Gray of rd_ptr (rd_clk)
     logic [PTR_WIDTH-1:0] wr_ptr_gray_sync; // synchronized wr Gray (in rd_clk domain)
 
+    `ifndef CDC_ASYNC_RESET
     initial begin
         wr_ptr_r      = '0;
         wr_ptr_gray_r = '0;
         rd_ptr_r      = '0;
         rd_ptr_gray_r = '0;
     end
+    `endif
 
     // -------------------------------------------------------------------------
     // Write domain — pointer and Gray registration
@@ -64,7 +67,11 @@ module cdc_fifo #(
 
     // Binary and Gray advance together — Gray is always in sync with binary,
     // and wr_ptr_gray_r is a stable FF output ready for the CDC synchronizer.
+    `ifdef CDC_ASYNC_RESET
     always_ff @(posedge i_wr_clk or negedge i_wr_rst_n) begin
+    `else
+    always_ff @(posedge i_wr_clk) begin
+    `endif
         if (!i_wr_rst_n) begin
             wr_ptr_r      <= '0;
             wr_ptr_gray_r <= '0;
@@ -101,7 +108,11 @@ module cdc_fifo #(
     // -------------------------------------------------------------------------
     assign rd_ptr_nxt = (i_rd_en && !o_empty) ? rd_ptr_r + 1'b1 : rd_ptr_r;
 
+    `ifdef CDC_ASYNC_RESET
     always_ff @(posedge i_rd_clk or negedge i_rd_rst_n) begin
+    `else
+    always_ff @(posedge i_rd_clk) begin
+    `endif
         if (!i_rd_rst_n) begin
             rd_ptr_r      <= '0;
             rd_ptr_gray_r <= '0;

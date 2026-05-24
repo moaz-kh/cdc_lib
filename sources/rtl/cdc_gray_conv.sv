@@ -2,6 +2,8 @@
 // Purely combinational bin-to-gray and gray-to-bin converter.
 // Can be used standalone for Gray code operations.
 
+`include "cdc_config.svh"
+
 module cdc_gray_conv #(
     parameter int WIDTH = 4
 ) (
