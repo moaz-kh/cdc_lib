@@ -21,10 +21,10 @@ module cdc_bit_tb;
         .SYNC_STAGES (SYNC_STAGES),
         .RESET_VALUE (1'b0)
     ) dut (
-        .clk      (clk_dst),
-        .rst_n    (rst_n),
-        .async_in (async_in),
-        .sync_out (sync_out)
+        .i_clk      (clk_dst),
+        .i_rst_n    (rst_n),
+        .i_async_in (async_in),
+        .o_sync_out (sync_out)
     );
 
     integer errors = 0;

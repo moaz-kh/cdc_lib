@@ -9,21 +9,21 @@ module cdc_sync_fifo #(
     // Derived
     parameter int ADDR_WIDTH = $clog2(DEPTH)
 ) (
-    input  logic                clk,
-    input  logic                rst_n,
+    input  logic                i_clk,
+    input  logic                i_rst_n,
 
     // Write interface
-    input  logic                wr_en,
-    input  logic [WIDTH-1:0]    wr_data,
-    output logic                full,
+    input  logic                i_wr_en,
+    input  logic [WIDTH-1:0]    i_wr_data,
+    output logic                o_full,
 
     // Read interface
-    input  logic                rd_en,
-    output logic [WIDTH-1:0]    rd_data,
-    output logic                empty,
+    input  logic                i_rd_en,
+    output logic [WIDTH-1:0]    o_rd_data,
+    output logic                o_empty,
 
     // Status
-    output logic [ADDR_WIDTH:0] count
+    output logic [ADDR_WIDTH:0] o_count
 );
 
     localparam int PTR_WIDTH = ADDR_WIDTH;
@@ -42,19 +42,19 @@ module cdc_sync_fifo #(
         fifo_count = '0;
     end
 
-    assign wr_en_int = wr_en & ~full;
-    assign rd_en_int = rd_en & ~empty;
+    assign wr_en_int = i_wr_en & ~o_full;
+    assign rd_en_int = i_rd_en & ~o_empty;
 
-    assign full  = (fifo_count == DEPTH[ADDR_WIDTH:0]);
-    assign empty = (fifo_count == '0);
-    assign count = fifo_count;
+    assign o_full  = (fifo_count == DEPTH[ADDR_WIDTH:0]);
+    assign o_empty = (fifo_count == '0);
+    assign o_count = fifo_count;
 
     // Write pointer and memory
-    always_ff @(posedge clk) begin
-        if (!rst_n)
+    always_ff @(posedge i_clk) begin
+        if (!i_rst_n)
             wr_ptr <= '0;
         else if (wr_en_int) begin
-            mem[wr_ptr] <= wr_data;
+            mem[wr_ptr] <= i_wr_data;
             wr_ptr      <= wr_ptr + 1'b1;
         end
     end
@@ -62,32 +62,32 @@ module cdc_sync_fifo #(
     // Read pointer and data path
     generate
         if (FWFT_MODE) begin : gen_fwft
-            assign rd_data = mem[rd_ptr];
+            assign o_rd_data = mem[rd_ptr];
 
-            always_ff @(posedge clk) begin
-                if (!rst_n)
+            always_ff @(posedge i_clk) begin
+                if (!i_rst_n)
                     rd_ptr <= '0;
                 else if (rd_en_int)
                     rd_ptr <= rd_ptr + 1'b1;
             end
         end else begin : gen_sync
-            initial rd_data = '0;
+            initial o_rd_data = '0;
 
-            always_ff @(posedge clk) begin
-                if (!rst_n) begin
-                    rd_ptr  <= '0;
-                    rd_data <= '0;
+            always_ff @(posedge i_clk) begin
+                if (!i_rst_n) begin
+                    rd_ptr    <= '0;
+                    o_rd_data <= '0;
                 end else if (rd_en_int) begin
-                    rd_data <= mem[rd_ptr];
-                    rd_ptr  <= rd_ptr + 1'b1;
+                    o_rd_data <= mem[rd_ptr];
+                    rd_ptr    <= rd_ptr + 1'b1;
                 end
             end
         end
     endgenerate
 
     // Count management
-    always_ff @(posedge clk) begin
-        if (!rst_n)
+    always_ff @(posedge i_clk) begin
+        if (!i_rst_n)
             fifo_count <= '0;
         else begin
             case ({wr_en_int, rd_en_int})

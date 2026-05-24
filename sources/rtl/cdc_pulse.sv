@@ -1,21 +1,21 @@
 // cdc_pulse.sv — Pulse Synchronizer
 // Two modes selectable via MODE parameter:
-//   MODE=0 (TOGGLE): Toggle-based — src_pulse toggles a FF, level crosses via
+//   MODE=0 (TOGGLE): Toggle-based — i_src_pulse toggles a FF, level crosses via
 //                     cdc_bit, edge detect in dst produces single-cycle pulse.
 //                     Lightweight, but back-to-back pulses must be spaced apart.
-//   MODE=1 (COUNTER): Counter-based — counts pulses in src domain, syncs counter
-//                      to dst domain via cdc_counter, dst generates pulses to
-//                      match. Guarantees N-in = N-out even with bursts.
+//   MODE=1 (COUNTER): Counter-based — delegates to cdc_counter which owns the
+//                      pulse count in the src domain and synchronizes it to dst.
+//                      dst generates pulses to match. Guarantees N-in = N-out.
 
 module cdc_pulse_toggle #(
     parameter int SYNC_STAGES = 2
 ) (
-    input  logic src_clk,
-    input  logic src_rst_n,
-    input  logic src_pulse,
-    input  logic dst_clk,
-    input  logic dst_rst_n,
-    output logic dst_pulse
+    input  logic i_src_clk,
+    input  logic i_src_rst_n,
+    input  logic i_src_pulse,
+    input  logic i_dst_clk,
+    input  logic i_dst_rst_n,
+    output logic o_dst_pulse
 );
 
     logic toggle_src;
@@ -27,10 +27,10 @@ module cdc_pulse_toggle #(
         toggle_dst_prev = 1'b0;
     end
 
-    always_ff @(posedge src_clk) begin
-        if (!src_rst_n)
+    always_ff @(posedge i_src_clk) begin
+        if (!i_src_rst_n)
             toggle_src <= 1'b0;
-        else if (src_pulse)
+        else if (i_src_pulse)
             toggle_src <= ~toggle_src;
     end
 
@@ -38,20 +38,20 @@ module cdc_pulse_toggle #(
         .SYNC_STAGES (SYNC_STAGES),
         .RESET_VALUE (1'b0)
     ) u_sync_toggle (
-        .clk      (dst_clk),
-        .rst_n    (dst_rst_n),
-        .async_in (toggle_src),
-        .sync_out (toggle_dst)
+        .i_clk      (i_dst_clk),
+        .i_rst_n    (i_dst_rst_n),
+        .i_async_in (toggle_src),
+        .o_sync_out (toggle_dst)
     );
 
-    always_ff @(posedge dst_clk) begin
-        if (!dst_rst_n)
+    always_ff @(posedge i_dst_clk) begin
+        if (!i_dst_rst_n)
             toggle_dst_prev <= 1'b0;
         else
             toggle_dst_prev <= toggle_dst;
     end
 
-    assign dst_pulse = toggle_dst ^ toggle_dst_prev;
+    assign o_dst_pulse = toggle_dst ^ toggle_dst_prev;
 
 endmodule
 
@@ -60,48 +60,43 @@ module cdc_pulse_counter #(
     parameter int SYNC_STAGES = 2,
     parameter int CTR_WIDTH   = 4
 ) (
-    input  logic src_clk,
-    input  logic src_rst_n,
-    input  logic src_pulse,
-    input  logic dst_clk,
-    input  logic dst_rst_n,
-    output logic dst_pulse
+    input  logic i_src_clk,
+    input  logic i_src_rst_n,
+    input  logic i_src_pulse,
+    input  logic i_dst_clk,
+    input  logic i_dst_rst_n,
+    output logic o_dst_pulse
 );
 
-    logic [CTR_WIDTH-1:0] src_count;
     logic [CTR_WIDTH-1:0] dst_count_sync;
     logic [CTR_WIDTH-1:0] dst_count_local;
     logic                 dst_pulse_r;
 
     initial begin
-        src_count       = '0;
         dst_count_local = '0;
         dst_pulse_r     = 1'b0;
     end
 
-    always_ff @(posedge src_clk) begin
-        if (!src_rst_n)
-            src_count <= '0;
-        else if (src_pulse)
-            src_count <= src_count + 1'b1;
-    end
-
+    // cdc_counter owns the src-domain pulse count and synchronizes it to dst.
     cdc_counter #(
         .WIDTH       (CTR_WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) u_sync_count (
-        .clk         (dst_clk),
-        .rst_n       (dst_rst_n),
-        .binary_in   (src_count),
-        .binary_out  (dst_count_sync),
-        .gray_out    (),
-        .gray_in_out ()
+        .i_src_clk    (i_src_clk),
+        .i_src_rst_n  (i_src_rst_n),
+        .i_count_up   (i_src_pulse),
+        .i_count_down (1'b0),
+        .o_src_count  (),
+        .i_dst_clk    (i_dst_clk),
+        .i_dst_rst_n  (i_dst_rst_n),
+        .o_dst_gray   (),
+        .o_dst_count  (dst_count_sync)
     );
 
     // Generate one pulse per count difference: exactly 1 dst_clk wide,
     // mandatory 1-cycle gap between consecutive pulses (self-gating via dst_pulse_r).
-    always_ff @(posedge dst_clk) begin
-        if (!dst_rst_n) begin
+    always_ff @(posedge i_dst_clk) begin
+        if (!i_dst_rst_n) begin
             dst_count_local <= '0;
             dst_pulse_r     <= 1'b0;
         end else begin
@@ -113,7 +108,7 @@ module cdc_pulse_counter #(
         end
     end
 
-    assign dst_pulse = dst_pulse_r;
+    assign o_dst_pulse = dst_pulse_r;
 
 endmodule
 
@@ -124,12 +119,12 @@ module cdc_pulse #(
     parameter int MODE        = 0,       // 0 = toggle, 1 = counter
     parameter int CTR_WIDTH   = 4        // Counter width for MODE=1
 ) (
-    input  logic src_clk,
-    input  logic src_rst_n,
-    input  logic src_pulse,
-    input  logic dst_clk,
-    input  logic dst_rst_n,
-    output logic dst_pulse
+    input  logic i_src_clk,
+    input  logic i_src_rst_n,
+    input  logic i_src_pulse,
+    input  logic i_dst_clk,
+    input  logic i_dst_rst_n,
+    output logic o_dst_pulse
 );
 
 generate
@@ -137,24 +132,24 @@ generate
         cdc_pulse_toggle #(
             .SYNC_STAGES (SYNC_STAGES)
         ) u_impl (
-            .src_clk   (src_clk),
-            .src_rst_n (src_rst_n),
-            .src_pulse (src_pulse),
-            .dst_clk   (dst_clk),
-            .dst_rst_n (dst_rst_n),
-            .dst_pulse (dst_pulse)
+            .i_src_clk    (i_src_clk),
+            .i_src_rst_n  (i_src_rst_n),
+            .i_src_pulse  (i_src_pulse),
+            .i_dst_clk    (i_dst_clk),
+            .i_dst_rst_n  (i_dst_rst_n),
+            .o_dst_pulse  (o_dst_pulse)
         );
     end else begin : gen_counter
         cdc_pulse_counter #(
             .SYNC_STAGES (SYNC_STAGES),
             .CTR_WIDTH   (CTR_WIDTH)
         ) u_impl (
-            .src_clk   (src_clk),
-            .src_rst_n (src_rst_n),
-            .src_pulse (src_pulse),
-            .dst_clk   (dst_clk),
-            .dst_rst_n (dst_rst_n),
-            .dst_pulse (dst_pulse)
+            .i_src_clk    (i_src_clk),
+            .i_src_rst_n  (i_src_rst_n),
+            .i_src_pulse  (i_src_pulse),
+            .i_dst_clk    (i_dst_clk),
+            .i_dst_rst_n  (i_dst_rst_n),
+            .o_dst_pulse  (o_dst_pulse)
         );
     end
 endgenerate

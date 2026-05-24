@@ -26,15 +26,15 @@ module cdc_sync_fifo_tb;
         .DEPTH     (DEPTH),
         .FWFT_MODE (FWFT_MODE)
     ) dut (
-        .clk     (clk),
-        .rst_n   (rst_n),
-        .wr_en   (wr_en),
-        .wr_data (wr_data),
-        .full    (full),
-        .rd_en   (rd_en),
-        .rd_data (rd_data),
-        .empty   (empty),
-        .count   (count)
+        .i_clk     (clk),
+        .i_rst_n   (rst_n),
+        .i_wr_en   (wr_en),
+        .i_wr_data (wr_data),
+        .o_full    (full),
+        .i_rd_en   (rd_en),
+        .o_rd_data (rd_data),
+        .o_empty   (empty),
+        .o_count   (count)
     );
 
     integer errors = 0;

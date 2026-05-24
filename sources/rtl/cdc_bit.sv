@@ -3,13 +3,13 @@
 // with ASYNC_REG attribute for proper FPGA placement.
 
 module cdc_bit #(
-    parameter int SYNC_STAGES = 2,
+    parameter int   SYNC_STAGES = 2,
     parameter logic RESET_VALUE = 1'b0
 ) (
-    input  logic clk,
-    input  logic rst_n,
-    input  logic async_in,
-    output logic sync_out
+    input  logic i_clk,
+    input  logic i_rst_n,
+    input  logic i_async_in,
+    output logic o_sync_out
 );
 
     (* ASYNC_REG = "TRUE" *)
@@ -19,13 +19,13 @@ module cdc_bit #(
         sync_chain = {SYNC_STAGES{RESET_VALUE}};
     end
 
-    always_ff @(posedge clk) begin
-        if (!rst_n)
+    always_ff @(posedge i_clk) begin
+        if (!i_rst_n)
             sync_chain <= {SYNC_STAGES{RESET_VALUE}};
         else
-            sync_chain <= {sync_chain[SYNC_STAGES-2:0], async_in};
+            sync_chain <= {sync_chain[SYNC_STAGES-2:0], i_async_in};
     end
 
-    assign sync_out = sync_chain[SYNC_STAGES-1];
+    assign o_sync_out = sync_chain[SYNC_STAGES-1];
 
 endmodule

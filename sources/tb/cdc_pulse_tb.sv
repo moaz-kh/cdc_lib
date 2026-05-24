@@ -22,12 +22,12 @@ module cdc_pulse_tb;
     cdc_pulse_toggle #(
         .SYNC_STAGES (SYNC_STAGES)
     ) dut_toggle (
-        .src_clk    (src_clk),
-        .src_rst_n  (src_rst_n),
-        .src_pulse  (src_pulse_t),
-        .dst_clk    (dst_clk),
-        .dst_rst_n  (dst_rst_n),
-        .dst_pulse  (dst_pulse_t)
+        .i_src_clk    (src_clk),
+        .i_src_rst_n  (src_rst_n),
+        .i_src_pulse  (src_pulse_t),
+        .i_dst_clk    (dst_clk),
+        .i_dst_rst_n  (dst_rst_n),
+        .o_dst_pulse  (dst_pulse_t)
     );
 
     // --- Counter mode (MODE=1) ---
@@ -37,12 +37,12 @@ module cdc_pulse_tb;
         .SYNC_STAGES (SYNC_STAGES),
         .CTR_WIDTH   (4)
     ) dut_counter (
-        .src_clk    (src_clk),
-        .src_rst_n  (src_rst_n),
-        .src_pulse  (src_pulse_c),
-        .dst_clk    (dst_clk),
-        .dst_rst_n  (dst_rst_n),
-        .dst_pulse  (dst_pulse_c)
+        .i_src_clk    (src_clk),
+        .i_src_rst_n  (src_rst_n),
+        .i_src_pulse  (src_pulse_c),
+        .i_dst_clk    (dst_clk),
+        .i_dst_rst_n  (dst_rst_n),
+        .o_dst_pulse  (dst_pulse_c)
     );
 
     integer errors = 0;

@@ -14,17 +14,17 @@ module cdc_counter #(
     parameter int unsigned SYNC_STAGES = 2
 ) (
     // Source clock domain
-    input  logic                src_clk,
-    input  logic                src_rst_n,
-    input  logic                count_up,
-    input  logic                count_down,
-    output logic [WIDTH-1:0]    src_count,   // binary count in source domain
+    input  logic                i_src_clk,
+    input  logic                i_src_rst_n,
+    input  logic                i_count_up,
+    input  logic                i_count_down,
+    output logic [WIDTH-1:0]    o_src_count,   // binary count in source domain
 
     // Destination clock domain
-    input  logic                dst_clk,
-    input  logic                dst_rst_n,
-    output logic [WIDTH-1:0]    dst_gray,    // synchronized Gray in dst domain
-    output logic [WIDTH-1:0]    dst_count    // synchronized binary in dst domain
+    input  logic                i_dst_clk,
+    input  logic                i_dst_rst_n,
+    output logic [WIDTH-1:0]    o_dst_gray,    // synchronized Gray in dst domain
+    output logic [WIDTH-1:0]    o_dst_count    // synchronized binary in dst domain
 );
 
     // -------------------------------------------------------------------------
@@ -35,15 +35,15 @@ module cdc_counter #(
     logic [WIDTH-1:0] gray_r;
 
     always_comb begin
-        if      (count_up   && !count_down) count_nxt = count_r + 1'b1;
-        else if (count_down && !count_up)   count_nxt = count_r - 1'b1;
-        else                                count_nxt = count_r;
+        if      (i_count_up   && !i_count_down) count_nxt = count_r + 1'b1;
+        else if (i_count_down && !i_count_up)   count_nxt = count_r - 1'b1;
+        else                                    count_nxt = count_r;
     end
 
     // Register binary and its Gray code in the same clock cycle — no extra
     // latency, and gray_r is always a stable FF output for the synchronizer.
-    always_ff @(posedge src_clk or negedge src_rst_n) begin
-        if (!src_rst_n) begin
+    always_ff @(posedge i_src_clk or negedge i_src_rst_n) begin
+        if (!i_src_rst_n) begin
             count_r <= '0;
             gray_r  <= '0;
         end else begin
@@ -52,7 +52,7 @@ module cdc_counter #(
         end
     end
 
-    assign src_count = count_r;
+    assign o_src_count = count_r;
 
     // -------------------------------------------------------------------------
     // Synchronize registered Gray to destination domain
@@ -61,18 +61,18 @@ module cdc_counter #(
         .WIDTH       (WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) u_gray_sync (
-        .clk      (dst_clk),
-        .rst_n    (dst_rst_n),
-        .gray_in  (gray_r),
-        .gray_out (dst_gray)
+        .i_clk   (i_dst_clk),
+        .i_rst_n (i_dst_rst_n),
+        .i_gray  (gray_r),
+        .o_gray  (o_dst_gray)
     );
 
     // Gray-to-binary for callers that need a binary value in the dst domain
     cdc_gray_conv #(.WIDTH(WIDTH)) u_gray2bin (
-        .binary_in  ('0),
-        .gray_out   (),
-        .gray_in    (dst_gray),
-        .binary_out (dst_count)
+        .i_binary ('0),
+        .o_gray   (),
+        .i_gray   (o_dst_gray),
+        .o_binary (o_dst_count)
     );
 
 endmodule

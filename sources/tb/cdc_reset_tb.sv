@@ -16,9 +16,9 @@ module cdc_reset_tb;
     cdc_reset #(
         .SYNC_STAGES(SYNC_STAGES)
     ) dut (
-        .clk         (clk),
-        .async_rst_n (async_rst_n),
-        .sync_rst_n  (sync_rst_n)
+        .i_clk         (clk),
+        .i_async_rst_n (async_rst_n),
+        .o_sync_rst_n  (sync_rst_n)
     );
 
     integer errors = 0;

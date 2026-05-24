@@ -24,15 +24,15 @@ module cdc_counter_tb;
         .WIDTH       (WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) dut (
-        .src_clk    (src_clk),
-        .src_rst_n  (src_rst_n),
-        .count_up   (count_up),
-        .count_down (count_down),
-        .src_count  (src_count),
-        .dst_clk    (dst_clk),
-        .dst_rst_n  (dst_rst_n),
-        .dst_gray   (dst_gray),
-        .dst_count  (dst_count)
+        .i_src_clk    (src_clk),
+        .i_src_rst_n  (src_rst_n),
+        .i_count_up   (count_up),
+        .i_count_down (count_down),
+        .o_src_count  (src_count),
+        .i_dst_clk    (dst_clk),
+        .i_dst_rst_n  (dst_rst_n),
+        .o_dst_gray   (dst_gray),
+        .o_dst_count  (dst_count)
     );
 
     function automatic [WIDTH-1:0] bin2gray(input [WIDTH-1:0] bin);

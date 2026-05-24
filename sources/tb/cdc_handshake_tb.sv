@@ -25,15 +25,15 @@ module cdc_handshake_tb;
         .WIDTH       (WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) dut (
-        .src_clk    (src_clk),
-        .src_rst_n  (src_rst_n),
-        .src_data   (src_data),
-        .src_valid  (src_valid),
-        .src_ready  (src_ready),
-        .dst_clk    (dst_clk),
-        .dst_rst_n  (dst_rst_n),
-        .dst_data   (dst_data),
-        .dst_valid  (dst_valid)
+        .i_src_clk    (src_clk),
+        .i_src_rst_n  (src_rst_n),
+        .i_src_data   (src_data),
+        .i_src_valid  (src_valid),
+        .o_src_ready  (src_ready),
+        .i_dst_clk    (dst_clk),
+        .i_dst_rst_n  (dst_rst_n),
+        .o_dst_data   (dst_data),
+        .o_dst_valid  (dst_valid)
     );
 
     integer errors = 0;

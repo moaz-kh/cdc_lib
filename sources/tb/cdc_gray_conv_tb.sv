@@ -10,10 +10,10 @@ module cdc_gray_conv_tb;
     logic [WIDTH-1:0] gray_in, binary_out;
 
     cdc_gray_conv #(.WIDTH(WIDTH)) dut (
-        .binary_in  (binary_in),
-        .gray_out   (gray_out),
-        .gray_in    (gray_in),
-        .binary_out (binary_out)
+        .i_binary  (binary_in),
+        .o_gray    (gray_out),
+        .i_gray    (gray_in),
+        .o_binary  (binary_out)
     );
 
     integer errors = 0;

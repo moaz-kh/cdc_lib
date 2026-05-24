@@ -26,9 +26,8 @@ This file provides guidance to Claude Code when working inside this FPGA project
 ```
 <project>/
 ├── sources/
-│   ├── rtl/            # RTL source files (.v / .sv  or  .vhd)
-│   │   └── STD_MODULES.*   # Standard utility modules — do not re-implement
-│   ├── tb/             # Testbenches  (<module>_tb.v  or  <module>_tb.vhd)
+│   ├── rtl/            # RTL source files (.sv) — all 9 cdc_* modules
+│   ├── tb/             # Testbenches  (<module>_tb.sv)
 │   ├── include/        # Include / header files
 │   ├── constraints/    # Pin constraint files (.pcf)
 │   └── rtl_list.f      # File list — must regenerate after adding/removing files
@@ -67,10 +66,10 @@ This file provides guidance to Claude Code when working inside this FPGA project
 
 Pass overrides directly on the command line.  Run `make update_list` first whenever files have been added or removed.
 
-| Parameter      | Controls                        | Default  |
-|----------------|---------------------------------|----------|
-| `TOP_MODULE`   | Top-level module / entity name  | adder    |
-| `TESTBENCH`    | Testbench module / entity name  | adder_tb |
+| Parameter      | Controls                        | Default      |
+|----------------|---------------------------------|--------------|
+| `TOP_MODULE`   | Top-level module / entity name  | cdc_bit      |
+| `TESTBENCH`    | Testbench module / entity name  | cdc_bit_tb   |
 | `FPGA_FAMILY`  | FPGA architecture               | ice40    |
 | `FPGA_DEVICE`  | Device part number              | up5k     |
 | `FPGA_PACKAGE` | Device package                  | sg48     |
@@ -93,19 +92,49 @@ The same override syntax applies to any target that invokes simulation or synthe
 - One module / entity per file; filename must match the module / entity name exactly.
 - RTL files go in `sources/rtl/`; never mix RTL and TB files in the same directory.
 - Constraint files use iCE40 PCF format and go in `sources/constraints/`.
+- **iverilog forward-reference rule**: Declare all signals before any module instantiation. iverilog elaborates top-down and rejects forward references to signals declared after the first `cdc_*` instantiation.
+- **Testbench stimulus timing**: Drive inputs `#1` after `@(posedge clk)` to avoid race conditions between `initial` and `always` blocks in Icarus Verilog.
 
 ---
 
-## Standard Modules Library
+## CDC Module Catalog
 
-These modules are already available in `STD_MODULES.v` / `STD_MODULES.vhd` — do not re-implement them:
+The library provides 9 modules in `sources/rtl/`. All modules are SystemVerilog (`.sv`).
 
-| Module                  | Purpose |
-|-------------------------|---------|
-| `synchronizer`          | Multi-bit clock-domain crossing synchroniser (parameterised WIDTH) |
-| `edge_detector`         | Positive- and negative-edge detection (sync or async input) |
-| `LED_logic`             | Configurable LED blinker / flasher (`time_count`, `toggle_count` parameters) |
-| `spi_interface_debounce`| Debounce SPI clock, MOSI, and CS_n signals |
+**Dependency hierarchy** (leaf → top):
+
+```
+cdc_bit                 — leaf: N-stage single-bit synchronizer
+cdc_reset               — leaf: async assert, sync deassert reset synchronizer
+cdc_gray_conv           — leaf: combinational binary ↔ Gray converter (both directions)
+cdc_gray_sync           — uses cdc_bit ×WIDTH: bit-parallel synchronizer for pre-registered Gray buses
+  |
+cdc_counter             — uses cdc_gray_sync + cdc_gray_conv: self-contained CDC-safe binary counter
+cdc_handshake           — uses cdc_bit ×2: four-phase toggle handshake for multi-bit bus transfer
+  |
+cdc_pulse               — uses cdc_bit (MODE=0) or cdc_counter (MODE=1): pulse synchronizer
+cdc_fifo                — uses cdc_gray_sync ×2: Cummings-style async FIFO
+cdc_sync_fifo           — standalone: single-clock synchronous FIFO (no CDC dependencies)
+```
+
+| Module           | Key parameters                         | Purpose |
+|------------------|----------------------------------------|---------|
+| `cdc_bit`        | `SYNC_STAGES`, `RESET_VALUE`           | N-stage single-bit synchronizer (fundamental building block) |
+| `cdc_reset`      | `SYNC_STAGES`                          | Async-assert / sync-deassert reset synchronizer |
+| `cdc_gray_conv`  | `WIDTH`                                | Combinational binary↔Gray conversion (both directions) |
+| `cdc_gray_sync`  | `WIDTH`, `SYNC_STAGES`                 | Bit-parallel synchronizer for pre-registered Gray buses |
+| `cdc_counter`    | `WIDTH`, `SYNC_STAGES`                 | Self-contained CDC-safe binary counter with `count_up`/`count_down` |
+| `cdc_handshake`  | `WIDTH`, `SYNC_STAGES`                 | Multi-bit bus transfer via four-phase toggle handshake |
+| `cdc_pulse`      | `SYNC_STAGES`, `MODE`, `CTR_WIDTH`     | Pulse synchronizer (toggle or counter mode) |
+| `cdc_fifo`       | `WIDTH`, `DEPTH`, `SYNC_STAGES`        | Async FIFO (DEPTH must be a power of 2 and ≥ 4) |
+| `cdc_sync_fifo`  | `WIDTH`, `DEPTH`, `FWFT_MODE`          | Single-clock synchronous FIFO |
+
+**Library-wide design conventions** (must be preserved in all modules):
+
+- `(* ASYNC_REG = "TRUE" *)` attribute on every synchronizer flip-flop chain for correct FPGA placement.
+- `initial` blocks set power-up state to match reset values — required for FPGA simulation before reset is released.
+- Synchronous reset (`posedge clk`) everywhere **except** `cdc_reset`, which uses async assert (`negedge async_rst_n`) by design.
+- `cdc_gray_sync` requires its `gray_in` to be a registered FF output from the source domain — it is the caller's responsibility to register before passing in.
 
 ---
 
@@ -113,9 +142,43 @@ These modules are already available in `STD_MODULES.v` / `STD_MODULES.vhd` — d
 
 Non-obvious design choices that must be preserved when modifying existing modules.
 
-### `cdc_pulse` — counter mode (`cdc_pulse_counter`)
+### `cdc_counter` — self-contained counter interface
 
-`dst_pulse` is a **registered output** (`dst_pulse_r`). Do not change it to a combinational assign of `(dst_count_local != dst_count_sync)`.
+`cdc_counter` owns its binary counter in the source domain. Its interface is `count_up`/`count_down` → `src_count` (source binary), `dst_gray` (synchronized Gray), `dst_count` (synchronized binary). It is **not** a passive synchronizer of an externally-supplied binary value — do not add a `binary_in` port.
+
+**Why:** Registering binary and Gray in the same clock cycle (inside the module) guarantees the CDC boundary always sees a stable FF output. An external caller could inadvertently violate this by presenting a combinational binary value.
+
+### `cdc_gray_sync` — caller must pre-register `gray_in`
+
+`cdc_gray_sync` takes a Gray-coded bus and passes each bit through `cdc_bit`. It does **not** register `gray_in` itself. The caller must ensure `gray_in` is a registered flip-flop output from the source domain.
+
+**Why:** If `gray_in` were combinational, metastability could affect multiple bits simultaneously — violating the single-bit-change guarantee that makes Gray code CDC-safe.
+
+### `cdc_fifo` — DEPTH constraint and full detection
+
+`DEPTH` must be a power of 2 and at least 4 (PTR_WIDTH ≥ 3). The full-flag uses the Cummings two-MSB-different rule: the top two MSBs of the local and synchronized Gray pointers differ while all remaining bits match. This comparison requires at least a 3-bit pointer.
+
+Both `wr_ptr_gray_r` and `rd_ptr_gray_r` are registered in their respective domains on the same clock edge as their binary counterparts — do not make them combinational assigns.
+
+### `cdc_handshake` — `o_src_ready` is combinational
+
+`o_src_ready` is driven by a combinational assign (`assign o_src_ready = ~busy`), not by a sequential always_ff. Do not convert it to a registered output.
+
+**Why:** A registered `o_src_ready` requires an explicit reset assignment. Without it the output starts as X, the while-loop guard in the testbench exits immediately, and the handshake never fires. The combinational form is self-initializing: `busy` resets to 0, so `o_src_ready` is immediately 1 after reset.
+
+### `cdc_handshake` — ack tracking
+
+In the destination domain, `ack_toggle <= req_sync` (not `<= ~ack_toggle`). The ack mirrors the synchronized req value so the source can compare `ack_sync == req_toggle` to detect round-trip completion.
+
+**Why:** Toggling ack independently would break if the destination deasserts before the ack fully propagates, causing the source to miss the completion signal.
+
+### `cdc_pulse_counter` — delegates the counter to `cdc_counter`
+
+`cdc_pulse_counter` feeds `i_src_pulse` directly into `cdc_counter`'s `i_count_up` port. It does **not** maintain its own source-domain counter. Do not add a separate `src_count` register and try to synchronize it manually — that was the previous (broken) design that used the old `binary_in`/`binary_out` interface.
+
+### `cdc_pulse_counter` — registered `o_dst_pulse`
+
+`o_dst_pulse` is driven by a registered signal (`dst_pulse_r`). Do not change it to a combinational assign of `(dst_count_local != dst_count_sync)`.
 
 **Why:** A combinational assign stays high for N consecutive dst cycles when N src pulses accumulate before the first dst pulse is processed — producing a single wide pulse instead of N separate 1-cycle pulses. The registered design uses `dst_pulse_r` as a self-gate: the in-flight pulse suppresses the next firing for one cycle, guaranteeing every output pulse is exactly 1 dst_clk wide with a mandatory 1-cycle gap between consecutive pulses.
 

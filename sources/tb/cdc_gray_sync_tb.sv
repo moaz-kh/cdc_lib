@@ -23,10 +23,10 @@ module cdc_gray_sync_tb;
         .WIDTH       (WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) dut (
-        .clk      (dst_clk),
-        .rst_n    (dst_rst_n),
-        .gray_in  (gray_in),
-        .gray_out (gray_out)
+        .i_clk   (dst_clk),
+        .i_rst_n (dst_rst_n),
+        .i_gray  (gray_in),
+        .o_gray  (gray_out)
     );
 
     function automatic [WIDTH-1:0] bin2gray(input [WIDTH-1:0] bin);

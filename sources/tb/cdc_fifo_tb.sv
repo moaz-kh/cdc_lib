@@ -27,16 +27,16 @@ module cdc_fifo_tb;
         .DEPTH       (DEPTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) dut (
-        .wr_clk   (wr_clk),
-        .wr_rst_n (wr_rst_n),
-        .wr_en    (wr_en),
-        .wr_data  (wr_data),
-        .full     (full),
-        .rd_clk   (rd_clk),
-        .rd_rst_n (rd_rst_n),
-        .rd_en    (rd_en),
-        .rd_data  (rd_data),
-        .empty    (empty)
+        .i_wr_clk   (wr_clk),
+        .i_wr_rst_n (wr_rst_n),
+        .i_wr_en    (wr_en),
+        .i_wr_data  (wr_data),
+        .o_full     (full),
+        .i_rd_clk   (rd_clk),
+        .i_rd_rst_n (rd_rst_n),
+        .i_rd_en    (rd_en),
+        .o_rd_data  (rd_data),
+        .o_empty    (empty)
     );
 
     integer errors = 0;

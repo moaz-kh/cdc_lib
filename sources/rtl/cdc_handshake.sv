@@ -8,17 +8,17 @@ module cdc_handshake #(
     parameter int SYNC_STAGES = 2
 ) (
     // Source domain
-    input  logic               src_clk,
-    input  logic               src_rst_n,
-    input  logic [WIDTH-1:0]   src_data,
-    input  logic               src_valid,
-    output logic               src_ready,
+    input  logic               i_src_clk,
+    input  logic               i_src_rst_n,
+    input  logic [WIDTH-1:0]   i_src_data,
+    input  logic               i_src_valid,
+    output logic               o_src_ready,
 
     // Destination domain
-    input  logic               dst_clk,
-    input  logic               dst_rst_n,
-    output logic [WIDTH-1:0]   dst_data,
-    output logic               dst_valid
+    input  logic               i_dst_clk,
+    input  logic               i_dst_rst_n,
+    output logic [WIDTH-1:0]   o_dst_data,
+    output logic               o_dst_valid
 );
 
     // All signal declarations up front (iverilog requires declaration before use)
@@ -39,8 +39,8 @@ module cdc_handshake #(
         busy          = 1'b0;
         ack_toggle    = 1'b0;
         req_sync_prev = 1'b0;
-        dst_data      = '0;
-        dst_valid     = 1'b0;
+        o_dst_data    = '0;
+        o_dst_valid   = 1'b0;
     end
 
     // --- Source domain ---
@@ -50,21 +50,21 @@ module cdc_handshake #(
         .SYNC_STAGES (SYNC_STAGES),
         .RESET_VALUE (1'b0)
     ) u_sync_ack (
-        .clk      (src_clk),
-        .rst_n    (src_rst_n),
-        .async_in (ack_toggle),
-        .sync_out (ack_sync)
+        .i_clk      (i_src_clk),
+        .i_rst_n    (i_src_rst_n),
+        .i_async_in (ack_toggle),
+        .o_sync_out (ack_sync)
     );
 
-    // Source logic: capture data and toggle req
-    always_ff @(posedge src_clk) begin
-        if (!src_rst_n) begin
+    // Source logic: capture data and toggle req on accepted transfer
+    always_ff @(posedge i_src_clk) begin
+        if (!i_src_rst_n) begin
             req_toggle <= 1'b0;
             data_hold  <= '0;
             busy       <= 1'b0;
         end else begin
-            if (src_valid && src_ready) begin
-                data_hold  <= src_data;
+            if (i_src_valid && o_src_ready) begin
+                data_hold  <= i_src_data;
                 req_toggle <= ~req_toggle;
                 busy       <= 1'b1;
             end else if (busy && (ack_sync == req_toggle)) begin
@@ -73,7 +73,9 @@ module cdc_handshake #(
         end
     end
 
-    assign src_ready = ~busy;
+    // o_src_ready is combinational: high whenever not busy
+    assign o_src_ready = ~busy;
+
 
     // --- Destination domain ---
 
@@ -82,27 +84,27 @@ module cdc_handshake #(
         .SYNC_STAGES (SYNC_STAGES),
         .RESET_VALUE (1'b0)
     ) u_sync_req (
-        .clk      (dst_clk),
-        .rst_n    (dst_rst_n),
-        .async_in (req_toggle),
-        .sync_out (req_sync)
+        .i_clk      (i_dst_clk),
+        .i_rst_n    (i_dst_rst_n),
+        .i_async_in (req_toggle),
+        .o_sync_out (req_sync)
     );
 
     // Destination logic: detect req change, capture data, ack
-    always_ff @(posedge dst_clk) begin
-        if (!dst_rst_n) begin
+    always_ff @(posedge i_dst_clk) begin
+        if (!i_dst_rst_n) begin
             ack_toggle    <= 1'b0;
             req_sync_prev <= 1'b0;
-            dst_data      <= '0;
-            dst_valid     <= 1'b0;
+            o_dst_data    <= '0;
+            o_dst_valid   <= 1'b0;
         end else begin
-            dst_valid     <= 1'b0;
+            o_dst_valid   <= 1'b0;
             req_sync_prev <= req_sync;
 
             if (req_sync != req_sync_prev) begin
-                dst_data   <= data_hold;
-                dst_valid  <= 1'b1;
-                ack_toggle <= req_sync;
+                o_dst_data  <= data_hold;
+                o_dst_valid <= 1'b1;
+                ack_toggle  <= req_sync;
             end
         end
     end
