@@ -1,6 +1,13 @@
-// cdc_fifo.sv — Small Async FIFO Bus Synchronizer
-// Cummings-style async FIFO using cdc_counter for pointer synchronization.
-// Small register-array memory with combinational read.
+//-----------------------------------------------------------------------------
+// Module : cdc_fifo
+// Purpose: Async FIFO with Cummings-style Gray-code pointer synchronization.
+//          Binary pointer and its Gray code are registered together in the
+//          source domain on the same clock edge, so the synchronizer input is
+//          always a stable FF output — no combinational glitches at CDC boundary.
+// Author : <author>
+// Date   : <date>
+//-----------------------------------------------------------------------------
+`default_nettype none
 
 module cdc_fifo #(
     parameter int WIDTH       = 8,
@@ -24,104 +31,103 @@ module cdc_fifo #(
     output logic                empty
 );
 
-    // Pointer width is ADDR_WIDTH+1 to distinguish full from empty
     localparam int PTR_WIDTH = ADDR_WIDTH + 1;
 
-    // --- All signal declarations up front (iverilog requires declaration before use) ---
-    logic [WIDTH-1:0] mem [0:DEPTH-1];
+    // -------------------------------------------------------------------------
+    // All signal declarations up front — iverilog requires declaration before use
+    // -------------------------------------------------------------------------
+    logic [WIDTH-1:0]    mem [0:DEPTH-1];
 
-    // Write domain signals
-    logic [PTR_WIDTH-1:0] wr_ptr;
-    logic [PTR_WIDTH-1:0] rd_ptr_sync;
-    logic [PTR_WIDTH-1:0] rd_ptr_gray_sync;
-    logic [PTR_WIDTH-1:0] wr_ptr_gray;
+    // Write domain
+    logic [PTR_WIDTH-1:0] wr_ptr_r;
+    logic [PTR_WIDTH-1:0] wr_ptr_nxt;
+    logic [PTR_WIDTH-1:0] wr_ptr_gray_r;    // registered Gray of wr_ptr (wr_clk)
+    logic [PTR_WIDTH-1:0] rd_ptr_gray_sync; // synchronized rd Gray (in wr_clk domain)
 
-    // Read domain signals
-    logic [PTR_WIDTH-1:0] rd_ptr;
-    logic [PTR_WIDTH-1:0] wr_ptr_sync;
-    logic [PTR_WIDTH-1:0] wr_ptr_gray_sync;
-    logic [PTR_WIDTH-1:0] rd_ptr_gray;
+    // Read domain
+    logic [PTR_WIDTH-1:0] rd_ptr_r;
+    logic [PTR_WIDTH-1:0] rd_ptr_nxt;
+    logic [PTR_WIDTH-1:0] rd_ptr_gray_r;    // registered Gray of rd_ptr (rd_clk)
+    logic [PTR_WIDTH-1:0] wr_ptr_gray_sync; // synchronized wr Gray (in rd_clk domain)
 
     initial begin
-        wr_ptr = '0;
-        rd_ptr = '0;
+        wr_ptr_r      = '0;
+        wr_ptr_gray_r = '0;
+        rd_ptr_r      = '0;
+        rd_ptr_gray_r = '0;
     end
 
-    // --- Write domain ---
+    // -------------------------------------------------------------------------
+    // Write domain — pointer and Gray registration
+    // -------------------------------------------------------------------------
+    assign wr_ptr_nxt = (wr_en && !full) ? wr_ptr_r + 1'b1 : wr_ptr_r;
 
-    always_ff @(posedge wr_clk) begin
-        if (!wr_rst_n)
-            wr_ptr <= '0;
-        else if (wr_en && !full)
-            wr_ptr <= wr_ptr + 1'b1;
+    // Binary and Gray advance together — Gray is always in sync with binary,
+    // and wr_ptr_gray_r is a stable FF output ready for the CDC synchronizer.
+    always_ff @(posedge wr_clk or negedge wr_rst_n) begin
+        if (!wr_rst_n) begin
+            wr_ptr_r      <= '0;
+            wr_ptr_gray_r <= '0;
+        end else begin
+            wr_ptr_r      <= wr_ptr_nxt;
+            wr_ptr_gray_r <= wr_ptr_nxt ^ (wr_ptr_nxt >> 1);
+        end
     end
 
     always_ff @(posedge wr_clk) begin
         if (wr_en && !full)
-            mem[wr_ptr[ADDR_WIDTH-1:0]] <= wr_data;
+            mem[wr_ptr_r[ADDR_WIDTH-1:0]] <= wr_data;
     end
 
-    // Synchronize read pointer to write domain
-    cdc_counter #(
+    // Synchronize rd_ptr_gray_r (rd_clk domain) into wr_clk domain
+    cdc_gray_sync #(
         .WIDTH       (PTR_WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) u_rd_ptr_sync (
-        .clk         (wr_clk),
-        .rst_n       (wr_rst_n),
-        .binary_in   (rd_ptr),
-        .binary_out  (rd_ptr_sync),
-        .gray_out    (rd_ptr_gray_sync),
-        .gray_in_out ()
+        .clk      (wr_clk),
+        .rst_n    (wr_rst_n),
+        .gray_in  (rd_ptr_gray_r),
+        .gray_out (rd_ptr_gray_sync)
     );
 
-    // Local wr_ptr Gray for full comparison
-    cdc_gray_conv #(.WIDTH(PTR_WIDTH)) u_wr_gray (
-        .binary_in  (wr_ptr),
-        .gray_out   (wr_ptr_gray),
-        .gray_in    ({PTR_WIDTH{1'b0}}),
-        .binary_out ()
-    );
+    // Full: top two MSBs of local and synced Gray differ; remaining bits match.
+    // Requires PTR_WIDTH >= 3 (DEPTH >= 4).
+    assign full = (wr_ptr_gray_r[PTR_WIDTH-1]   != rd_ptr_gray_sync[PTR_WIDTH-1]) &&
+                  (wr_ptr_gray_r[PTR_WIDTH-2]   != rd_ptr_gray_sync[PTR_WIDTH-2]) &&
+                  (wr_ptr_gray_r[PTR_WIDTH-3:0] == rd_ptr_gray_sync[PTR_WIDTH-3:0]);
 
-    // Full detection: Gray code comparison
-    // Full when top 2 MSBs differ and remaining bits match
-    assign full = (wr_ptr_gray[PTR_WIDTH-1]   != rd_ptr_gray_sync[PTR_WIDTH-1]) &&
-                  (wr_ptr_gray[PTR_WIDTH-2]   != rd_ptr_gray_sync[PTR_WIDTH-2]) &&
-                  (wr_ptr_gray[PTR_WIDTH-3:0] == rd_ptr_gray_sync[PTR_WIDTH-3:0]);
+    // -------------------------------------------------------------------------
+    // Read domain — pointer and Gray registration
+    // -------------------------------------------------------------------------
+    assign rd_ptr_nxt = (rd_en && !empty) ? rd_ptr_r + 1'b1 : rd_ptr_r;
 
-    // --- Read domain ---
-
-    always_ff @(posedge rd_clk) begin
-        if (!rd_rst_n)
-            rd_ptr <= '0;
-        else if (rd_en && !empty)
-            rd_ptr <= rd_ptr + 1'b1;
+    always_ff @(posedge rd_clk or negedge rd_rst_n) begin
+        if (!rd_rst_n) begin
+            rd_ptr_r      <= '0;
+            rd_ptr_gray_r <= '0;
+        end else begin
+            rd_ptr_r      <= rd_ptr_nxt;
+            rd_ptr_gray_r <= rd_ptr_nxt ^ (rd_ptr_nxt >> 1);
+        end
     end
 
-    // Combinational read
-    assign rd_data = mem[rd_ptr[ADDR_WIDTH-1:0]];
+    // Combinational read — data available the cycle rd_ptr_r is valid
+    assign rd_data = mem[rd_ptr_r[ADDR_WIDTH-1:0]];
 
-    // Synchronize write pointer to read domain
-    cdc_counter #(
+    // Synchronize wr_ptr_gray_r (wr_clk domain) into rd_clk domain
+    cdc_gray_sync #(
         .WIDTH       (PTR_WIDTH),
         .SYNC_STAGES (SYNC_STAGES)
     ) u_wr_ptr_sync (
-        .clk         (rd_clk),
-        .rst_n       (rd_rst_n),
-        .binary_in   (wr_ptr),
-        .binary_out  (wr_ptr_sync),
-        .gray_out    (wr_ptr_gray_sync),
-        .gray_in_out ()
+        .clk      (rd_clk),
+        .rst_n    (rd_rst_n),
+        .gray_in  (wr_ptr_gray_r),
+        .gray_out (wr_ptr_gray_sync)
     );
 
-    // Local rd_ptr Gray for empty comparison
-    cdc_gray_conv #(.WIDTH(PTR_WIDTH)) u_rd_gray (
-        .binary_in  (rd_ptr),
-        .gray_out   (rd_ptr_gray),
-        .gray_in    ({PTR_WIDTH{1'b0}}),
-        .binary_out ()
-    );
-
-    // Empty detection: read Gray == synchronized write Gray
-    assign empty = (rd_ptr_gray == wr_ptr_gray_sync);
+    // Empty: local rd Gray equals synchronized wr Gray
+    assign empty = (rd_ptr_gray_r == wr_ptr_gray_sync);
 
 endmodule
+
+`default_nettype wire
