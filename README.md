@@ -1,6 +1,6 @@
 # cdc_lib
 
-A reusable, parameterized **Clock Domain Crossing (CDC)** synchronizer library in SystemVerilog. Provides 9 hierarchical modules covering the most common CDC patterns — from single-bit synchronization to async and sync FIFOs.
+A reusable, parameterized **Clock Domain Crossing (CDC)** synchronizer library in SystemVerilog. Provides 10 hierarchical modules covering the most common CDC patterns — from single-bit synchronization to async and sync FIFOs.
 
 All modules are verified with self-checking testbenches and pass iCE40 synthesis (Yosys). Supports both **FPGA** (sync reset, `initial` blocks) and **ASIC** (async reset, no `initial` blocks) flows via a single compile-time macro.
 
@@ -12,6 +12,9 @@ cdc_reset             async-assert / sync-deassert reset synchronizer (leaf)
 cdc_gray_conv         combinational binary <-> Gray code converter (leaf)
 cdc_gray_sync         bit-parallel Gray-code synchronizer
   |--------------------uses cdc_bit x WIDTH
+  |
+cdc_qualifier         level-qualified data bus synchronizer
+  |--------------------uses cdc_bit
   |
 cdc_counter           self-contained CDC-safe binary counter
   |--------------------uses cdc_gray_sync
@@ -77,6 +80,23 @@ Bit-parallel synchronizer for a pre-registered Gray-code bus. Instantiates one `
 |-----------|---------|-------------|
 | `WIDTH` | 4 | Bus width |
 | `SYNC_STAGES` | 2 | Synchronizer depth per bit |
+
+### cdc_qualifier
+
+Level-qualified data bus synchronizer. Synchronizes a level-held `i_valid` into the destination domain via `cdc_bit`, then uses the synchronized valid as a load-enable to capture `i_data` directly. No ack path back to the source — the caller must hold `i_data` and `i_valid` stable for at least `SYNC_STAGES+1` destination clocks.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `WIDTH` | 8 | Data bus width |
+| `SYNC_STAGES` | 2 | Synchronizer depth |
+
+```
+i_data, i_valid (held stable)  --[cdc_bit]--> o_valid (destination domain)
+                                     |
+                                     +--load enable--> o_data
+```
+
+`o_data` lags `o_valid` by one extra destination clock (registered load-enable), so total latency from `i_valid` asserting to `o_data` updating is `SYNC_STAGES+1` cycles. Simpler than `cdc_handshake` when the source can hold a value for multiple destination clocks and no back-pressure is needed.
 
 ### cdc_counter
 
@@ -198,6 +218,7 @@ make sim TOP_MODULE=cdc_bit         TESTBENCH=cdc_bit_tb
 make sim TOP_MODULE=cdc_reset       TESTBENCH=cdc_reset_tb
 make sim TOP_MODULE=cdc_gray_conv   TESTBENCH=cdc_gray_conv_tb
 make sim TOP_MODULE=cdc_gray_sync   TESTBENCH=cdc_gray_sync_tb
+make sim TOP_MODULE=cdc_qualifier   TESTBENCH=cdc_qualifier_tb
 make sim TOP_MODULE=cdc_counter     TESTBENCH=cdc_counter_tb
 make sim TOP_MODULE=cdc_handshake   TESTBENCH=cdc_handshake_tb
 make sim TOP_MODULE=cdc_pulse       TESTBENCH=cdc_pulse_tb
@@ -238,6 +259,13 @@ cdc_reset #(.SYNC_STAGES(3)) u_rst_sync (
 cdc_pulse #(.MODE(1), .CTR_WIDTH(8)) u_irq_sync (
     .i_src_clk   (periph_clk), .i_src_rst_n (periph_rst_n), .i_src_pulse (irq_pulse),
     .i_dst_clk   (cpu_clk),    .i_dst_rst_n (cpu_rst_n),    .o_dst_pulse (irq_synced)
+);
+
+// Transfer a level-held value with no back-pressure
+cdc_qualifier #(.WIDTH(8)) u_status_sync (
+    .i_clk   (core_clk),  .i_rst_n (core_rst_n),
+    .i_data  (status_data), .i_valid (status_valid),
+    .o_data  (status_synced), .o_valid (status_synced_valid)
 );
 
 // Transfer a register value with handshake
@@ -284,12 +312,13 @@ cdc_lib/
 │   │   ├── cdc_reset.sv
 │   │   ├── cdc_gray_conv.sv
 │   │   ├── cdc_gray_sync.sv
+│   │   ├── cdc_qualifier.sv
 │   │   ├── cdc_counter.sv
 │   │   ├── cdc_handshake.sv
 │   │   ├── cdc_pulse.sv
 │   │   ├── cdc_fifo.sv
 │   │   └── cdc_sync_fifo.sv
-│   ├── tb/                          # 9 self-checking testbenches
+│   ├── tb/                          # 10 self-checking testbenches
 │   ├── include/
 │   │   └── cdc_config.svh           # Reset style configuration
 │   └── constraints/
@@ -322,12 +351,15 @@ cdc_lib/
 | cdc_reset | PASS | PASS | PASS |
 | cdc_gray_conv | PASS | PASS | PASS |
 | cdc_gray_sync | PASS | PASS | PASS |
+| cdc_qualifier | PASS | PASS | N/A* |
 | cdc_counter | PASS | PASS | PASS |
 | cdc_handshake | PASS | PASS | PASS |
 | cdc_pulse (toggle) | PASS | PASS | PASS |
 | cdc_pulse (counter) | PASS | PASS | PASS |
 | cdc_fifo | PASS | PASS | PASS |
 | cdc_sync_fifo | PASS | PASS | PASS |
+
+\* `cdc_qualifier` synthesis is untested — `make synth-ice40` currently fails to locate `cdc_config.svh` for every module (missing `-I$(INCLUDE_DIR)` in `SYNTH_FLAGS`), a pre-existing Makefile issue unrelated to this module.
 
 ## Development
 
