@@ -1,9 +1,20 @@
 //-----------------------------------------------------------------------------
 // Module : cdc_fifo
-// Purpose: Async FIFO with Cummings-style Gray-code pointer synchronization.
+// Purpose: Async FIFO with Gray-code pointer synchronization.
 //          Binary pointer and its Gray code are registered together in the
 //          source domain on the same clock edge, so the synchronizer input is
 //          always a stable FF output — no combinational glitches at CDC boundary.
+//
+// Reference: Clifford E. Cummings, "Simulation and Synthesis Techniques for
+//            Asynchronous FIFO Design", SNUG 2002.
+//            Available at: http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf
+//
+//            Key techniques adopted from this work:
+//              - Gray-code pointers for metastability-safe CDC
+//              - Extra pointer MSB (PTR_WIDTH = addr_bits + 1) for
+//                unambiguous full/empty detection
+//              - Two-MSB-different rule for full flag generation
+//              - Registering binary and Gray together in the source domain
 // Author : <author>
 // Date   : <date>
 //-----------------------------------------------------------------------------
