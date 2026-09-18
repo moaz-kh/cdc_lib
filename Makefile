@@ -669,7 +669,7 @@ status:
 	@echo ""
 	@echo "Source files:"
 	@find $(RTL_DIR) -name "*.v" -o -name "*.sv" 2>/dev/null | wc -l | awk '{print "  RTL files: " $$1}'
-	@find $(TB_DIR) -name "*_tb.v" -o -name "tb_*.v" 2>/dev/null | wc -l | awk '{print "  Testbenches: " $$1}'
+	@find $(TB_DIR) -name "*_tb.v" -o -name "*_tb.sv" -o -name "tb_*.v" -o -name "tb_*.sv" 2>/dev/null | wc -l | awk '{print "  Testbenches: " $$1}'
 	@echo ""
 	@echo "Build status ($(FPGA_FAMILY)):"
 ifeq ($(FPGA_FAMILY),ice40)
