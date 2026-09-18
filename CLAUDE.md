@@ -99,7 +99,7 @@ The same override syntax applies to any target that invokes simulation or synthe
 
 ## CDC Module Catalog
 
-The library provides 9 modules in `sources/rtl/`. All modules are SystemVerilog (`.sv`).
+The library provides 10 modules in `sources/rtl/`. All modules are SystemVerilog (`.sv`).
 
 **Dependency hierarchy** (leaf → top):
 
@@ -108,6 +108,8 @@ cdc_bit                 — leaf: N-stage single-bit synchronizer
 cdc_reset               — leaf: async assert, sync deassert reset synchronizer
 cdc_gray_conv           — leaf: combinational binary ↔ Gray converter (both directions)
 cdc_gray_sync           — uses cdc_bit ×WIDTH: bit-parallel synchronizer for pre-registered Gray buses
+  |
+cdc_qualifier           — uses cdc_bit: level-qualified data bus synchronizer
   |
 cdc_counter             — uses cdc_gray_sync + cdc_gray_conv: self-contained CDC-safe binary counter
 cdc_handshake           — uses cdc_bit ×2: four-phase toggle handshake for multi-bit bus transfer
@@ -123,6 +125,7 @@ cdc_sync_fifo           — standalone: single-clock synchronous FIFO (no CDC de
 | `cdc_reset`      | `SYNC_STAGES`                          | Async-assert / sync-deassert reset synchronizer |
 | `cdc_gray_conv`  | `WIDTH`                                | Combinational binary↔Gray conversion (both directions) |
 | `cdc_gray_sync`  | `WIDTH`, `SYNC_STAGES`                 | Bit-parallel synchronizer for pre-registered Gray buses |
+| `cdc_qualifier`  | `WIDTH`, `SYNC_STAGES`                 | Level-qualified data bus synchronizer (no ack path, caller holds data stable) |
 | `cdc_counter`    | `WIDTH`, `SYNC_STAGES`                 | Self-contained CDC-safe binary counter with `count_up`/`count_down` |
 | `cdc_handshake`  | `WIDTH`, `SYNC_STAGES`                 | Multi-bit bus transfer via four-phase toggle handshake |
 | `cdc_pulse`      | `SYNC_STAGES`, `MODE`, `CTR_WIDTH`     | Pulse synchronizer (toggle or counter mode) |

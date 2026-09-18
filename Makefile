@@ -1,7 +1,7 @@
 # Makefile Template for Digital Design Projects
 # Family-based architecture with iCE40 implementation
 
-PROJECT = sync_lib
+PROJECT = cdc_lib
 TOP_MODULE ?= cdc_bit
 TESTBENCH ?= cdc_bit_tb
 
@@ -442,8 +442,8 @@ ifdef YOSYS
 	@echo "# Auto-generated Yosys script for iCE40" > $(SYNTH_DIR)/yosys_script_ice40.ys
 	@sed '/# Testbench Files/q' $(FILELIST) | grep '^[^#[:space:]]' | while read file; do \
 		case "$$file" in \
-			*.sv) echo "read_verilog -sv $(SYNTH_FLAGS) $$file" ;; \
-			*.v)  echo "read_verilog $(SYNTH_FLAGS) $$file" ;; \
+			*.sv) echo "read_verilog -sv -I$(INCLUDE_DIR) $(SYNTH_FLAGS) $$file" ;; \
+			*.v)  echo "read_verilog -I$(INCLUDE_DIR) $(SYNTH_FLAGS) $$file" ;; \
 			*.vhd|*.vhdl) echo "read_vhdl $$file" ;; \
 			*) echo "# Unsupported file type: $$file" ;; \
 		esac; \
